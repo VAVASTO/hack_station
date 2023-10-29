@@ -4,10 +4,19 @@ from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from app.models import Station
+from app.models import Items
+from app.models import Wheels
+from app.models import SolarPanels
+from app.models import Other
 from rest_framework.decorators import api_view
 import noise
 from django.http import JsonResponse
 from .serializers import StationSerializer
+from .serializers import ItemsSerializer
+from .serializers import MultipleItemsSerializer
+from .serializers import WheelsSerializer
+from .serializers import SolarPanelsSerializer
+from .serializers import OtherSerializer
 import numpy as np
 #from app.tasks import print_hello
 
@@ -19,7 +28,7 @@ def say_hello(request):
 
 def generate_map(request):
     print("start generating...")
-    width, height = 400, 400
+    width, height = 100, 100
 
     scale = 100
     octaves = 6
@@ -59,70 +68,63 @@ def get_current_coordinates(request):
     serializer = StationSerializer(station)
     return JsonResponse(serializer.data)
 
-# Преобразуем синхронные функции в асинхронные
-async_set_current_position = sync_to_async(set_current_position)
-async_get_station = sync_to_async(Station.objects.get)
-
-# Асинхронный обработчик для обновления координат каждую секунду
-async def update_coordinates(coordinates):
-    while True:
-        # Ваша логика обновления координат здесь
-        x, y = coordinates[0]
-        del coordinates[0]
-        station = await async_get_station(station_id=1)
-
-        # Используйте асинхронную транзакцию для безопасного обновления данных в базе данных
-        async with transaction.atomic():
-            station.current_x = x
-            station.current_y = y
-            await station.save()
-
-        # Приостанавливаем выполнение на 1 секунду
-        await asyncio.sleep(1)
-
-# Глобальная переменная для хранения корутины
-update_coordinates_task = None
-
-# Обработчик для запуска асинхронного обновления координат
 @api_view(['POST'])
-async def start_update_coordinates(request):
-    global update_coordinates_task
+def break_something(request):
+    name = request.data.get('name')
+    item_index = request.data.get('item_id')
+    new_status = request.data.get('status')
+    print(name, item_index, new_status)
+    try:
+        item = Items.objects.get(name=name, item_index=item_index)
+        item.status = new_status
+        item.save()  
+        return HttpResponse("Item status updated successfully.")
+    except Items.DoesNotExist:
+        return HttpResponse("Item not found.", status=404)
+    
+@api_view(['GET'])
+def get_broken_detail(request):
+    try:
+        item = Items.objects.get(status="Требует замены")
+        serializer = ItemsSerializer(item)  # Serialize the item object
+        return JsonResponse(serializer.data)
+    except Items.DoesNotExist:
+        return HttpResponse("Item not found", status=404)
+    
+@api_view(['GET'])
+def get_details(request):
+    try:
+        items = Items.objects.all()  # Получите все объекты модели Items
+        serializer = MultipleItemsSerializer(items, many=True)  # Сериализуйте список объектов
+        return JsonResponse(serializer.data, safe=False)
+    except Items.DoesNotExist:
+        return HttpResponse("Items not found", status=404)
+    
 
-    if request.method == 'POST':
-        data = request.POST
-        print(f"\n\ndata = {data}\n\n")
-        print(f"\n\ndata_x = {data.getlist('x')}\n\n")
-        coordinates = data.getlist('x'), data.getlist('y')
-        print(coordinates)
+@api_view(['GET'])
+def get_wheels(request):
+    try:
+        items = Wheels.objects.all()  # Получите все объекты модели Items
+        serializer = WheelsSerializer(items, many=True)  # Сериализуйте список объектов
+        return JsonResponse(serializer.data, safe=False)
+    except Wheels.DoesNotExist:
+        return HttpResponse("Items not found", status=404)
+    
 
-        # Остановим существующую корутину, если она существует
-        if update_coordinates_task is not None:
-            update_coordinates_task.cancel()
-
-        # Создаем новую корутину для обновления координат
-        update_coordinates_task = asyncio.ensure_future(update_coordinates(coordinates))
-
-        return JsonResponse({'message': 'Update started.'})
-
-    return JsonResponse({'message': 'Invalid request method.'})
-
-# Обработчик для остановки асинхронного обновления координат
-@csrf_exempt
-def stop_update_coordinates(request):
-    global update_coordinates_task
-
-    if request.method == 'POST':
-        # Останавливаем корутину, если она существует
-        if update_coordinates_task is not None:
-            update_coordinates_task.cancel()
-            update_coordinates_task = None
-            return JsonResponse({'message': 'Update stopped.'})
-
-    return JsonResponse({'message': 'Invalid request method.'})
-
-# Обработчик для получения текущих координат
-def get_current_coordinates(request):
-    station = Station.objects.get(station_id=1)
-    serializer = StationSerializer(station)
-    return JsonResponse(serializer.data)
-
+@api_view(['GET'])
+def get_solar_panel(request):
+    try:
+        items = SolarPanels.objects.all()  # Получите все объекты модели Items
+        serializer = SolarPanelsSerializer(items, many=True)  # Сериализуйте список объектов
+        return JsonResponse(serializer.data, safe=False)
+    except SolarPanels.DoesNotExist:
+        return HttpResponse("Items not found", status=404)
+    
+@api_view(['GET'])
+def get_other(request):
+    try:
+        items = Other.objects.all()  # Получите все объекты модели Items
+        serializer = OtherSerializer(items, many=True)  # Сериализуйте список объектов
+        return JsonResponse(serializer.data, safe=False)
+    except Other.DoesNotExist:
+        return HttpResponse("Items not found", status=404)

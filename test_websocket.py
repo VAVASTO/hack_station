@@ -2,7 +2,7 @@ import asyncio
 import websockets
 
 async def test_websocket_connection():
-    uri = "ws://localhost:8001/ws/some_path/"  # Замените на ваш адрес веб-сокета
+    uri = "ws://localhost:8000/ws/route/generate/"  # Замените на ваш адрес веб-сокета
 
     async with websockets.connect(uri) as websocket:
         # Отправляем сообщение на веб-сокет сервер
